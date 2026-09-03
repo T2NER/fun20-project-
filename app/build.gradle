@@ -4,10 +4,35 @@ plugins {
 
 def TEST_ADMOB_APP_ID = 'ca-app-pub-3940256099942544~3347511713'
 def TEST_BANNER_ID = 'ca-app-pub-3940256099942544/6300978111'
-def adProp = { String name, String fallback -> providers.gradleProperty(name).orElse(fallback).get() }
+def isProductionRelease = providers.environmentVariable('PLAYFUN20_PRODUCTION').orElse('false').get().toBoolean()
+def adProp = { String name, String fallback ->
+    def value = providers.gradleProperty(name).orNull
+    if (isProductionRelease && (value == null || value.trim().isEmpty() || value == fallback)) {
+        throw new GradleException("Production release requires a real value for ${name}; Google test IDs are not allowed.")
+    }
+    value ?: fallback
+}
 
 def flavorPropertyKey = { String flavorName ->
     flavorName.replaceAll(/([a-z])([A-Z])/, '$1_$2').toUpperCase()
+}
+
+def uploadKeystorePath = providers.environmentVariable('UPLOAD_KEYSTORE_PATH').orNull
+def uploadStorePassword = providers.environmentVariable('UPLOAD_STORE_PASSWORD').orNull
+def uploadKeyAlias = providers.environmentVariable('UPLOAD_KEY_ALIAS').orNull
+def uploadKeyPassword = providers.environmentVariable('UPLOAD_KEY_PASSWORD').orNull
+
+def requireSigningValue = { String name, String value ->
+    if (isProductionRelease && (value == null || value.trim().isEmpty())) {
+        throw new GradleException("Production release requires ${name}.")
+    }
+}
+
+if (isProductionRelease) {
+    requireSigningValue('UPLOAD_KEYSTORE_PATH', uploadKeystorePath)
+    requireSigningValue('UPLOAD_STORE_PASSWORD', uploadStorePassword)
+    requireSigningValue('UPLOAD_KEY_ALIAS', uploadKeyAlias)
+    requireSigningValue('UPLOAD_KEY_PASSWORD', uploadKeyPassword)
 }
 
 android {
@@ -19,6 +44,25 @@ android {
         targetSdk 36
         versionCode 1
         versionName '1.0'
+    }
+
+    signingConfigs {
+        release {
+            if (isProductionRelease) {
+                storeFile file(uploadKeystorePath)
+                storePassword uploadStorePassword
+                keyAlias uploadKeyAlias
+                keyPassword uploadKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (isProductionRelease) {
+                signingConfig signingConfigs.release
+            }
+        }
     }
 
     flavorDimensions += 'app'
@@ -63,6 +107,15 @@ android {
 
     packaging {
         resources { excludes += ['/META-INF/{AL2.0,LGPL2.1}'] }
+    }
+}
+
+tasks.register('verifyProductionConfig') {
+    doLast {
+        if (!isProductionRelease) {
+            throw new GradleException('verifyProductionConfig must run with PLAYFUN20_PRODUCTION=true')
+        }
+        println 'Production configuration verified: real AdMob IDs required for all 20 flavors and release signing is configured.'
     }
 }
 
