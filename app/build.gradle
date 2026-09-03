@@ -2,6 +2,14 @@ plugins {
     id 'com.android.application'
 }
 
+def TEST_ADMOB_APP_ID = 'ca-app-pub-3940256099942544~3347511713'
+def TEST_BANNER_ID = 'ca-app-pub-3940256099942544/6300978111'
+def adProp = { String name, String fallback -> providers.gradleProperty(name).orElse(fallback).get() }
+
+def flavorPropertyKey = { String flavorName ->
+    flavorName.replaceAll(/([a-z])([A-Z])/, '$1_$2').toUpperCase()
+}
+
 android {
     namespace 'com.t2ner.funpack'
     compileSdk 36
@@ -37,6 +45,12 @@ android {
         pocketGuard { dimension "app"; applicationId "com.t2ner.pocketguardalarm"; resValue "string", "app_name", "PocketGuard Alarm"; buildConfigField "String", "APP_KEY", '"pocketGuard"' }
     }
 
+    productFlavors.all { flavor ->
+        def key = flavorPropertyKey(flavor.name)
+        flavor.resValue "string", "admob_app_id", adProp("ADMOB_APP_ID_${key}", TEST_ADMOB_APP_ID)
+        flavor.resValue "string", "admob_banner_id", adProp("ADMOB_BANNER_ID_${key}", TEST_BANNER_ID)
+    }
+
     buildFeatures {
         buildConfig true
         resValues true
@@ -50,4 +64,9 @@ android {
     packaging {
         resources { excludes += ['/META-INF/{AL2.0,LGPL2.1}'] }
     }
+}
+
+dependencies {
+    implementation 'com.google.android.gms:play-services-ads:25.4.0'
+    implementation 'com.google.android.ump:user-messaging-platform:4.0.0'
 }
