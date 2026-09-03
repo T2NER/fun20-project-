@@ -47,6 +47,7 @@ jobs:
   emulator-smoke:
     needs: build-lint
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -69,8 +70,8 @@ jobs:
           profile: pixel_6
           disable-animations: false
           script: |
+            set -eu
+            timeout 60s adb wait-for-device
             APK_COUNT=$(find app/build/outputs/apk -name '*-debug.apk' | wc -l); echo "Debug APKs=$APK_COUNT"; test "$APK_COUNT" -eq 20
-            find app/build/outputs/apk -name '*-debug.apk' -print | sort | xargs -n1 adb install -r
-            for pkg in com.t2ner.truthtap com.t2ner.roastbutton com.t2ner.bsmeter com.t2ner.fakecallfun com.t2ner.mostlikelyparty com.t2ner.daredrop com.t2ner.settleit com.t2ner.screencrackprank com.t2ner.voicewarplite com.t2ner.prankdeck com.t2ner.ageguessfun com.t2ner.facescorefun com.t2ner.barkback com.t2ner.babbleback com.t2ner.spookyradar com.t2ner.spindecide com.t2ner.askorb com.t2ner.escapecall com.t2ner.tapreflex com.t2ner.pocketguardalarm; do echo "SMOKE $pkg"; adb logcat -c; adb shell monkey -p "$pkg" -c android.intent.category.LAUNCHER 1 >/dev/null; sleep 2; adb shell monkey -p "$pkg" --throttle 50 25 >/dev/null || true; sleep 1; if adb logcat -d '*:E' | grep -E 'FATAL EXCEPTION|AndroidRuntime' | grep -q "$pkg"; then echo "Crash detected in $pkg"; adb logcat -d '*:E'; exit 1; fi; adb shell am force-stop "$pkg"; done
-
-# regression rerun trigger 2026-09-03
+            for apk in $(find app/build/outputs/apk -name '*-debug.apk' -print | sort); do echo "INSTALL $apk"; timeout 45s adb install -r "$apk"; done
+            for pkg in com.t2ner.truthtap com.t2ner.roastbutton com.t2ner.bsmeter com.t2ner.fakecallfun com.t2ner.mostlikelyparty com.t2ner.daredrop com.t2ner.settleit com.t2ner.screencrackprank com.t2ner.voicewarplite com.t2ner.prankdeck com.t2ner.ageguessfun com.t2ner.facescorefun com.t2ner.barkback com.t2ner.babbleback com.t2ner.spookyradar com.t2ner.spindecide com.t2ner.askorb com.t2ner.escapecall com.t2ner.tapreflex com.t2ner.pocketguardalarm; do echo "SMOKE $pkg"; timeout 10s adb logcat -c || true; timeout 20s adb shell monkey -p "$pkg" -c android.intent.category.LAUNCHER 1 >/dev/null; sleep 2; timeout 30s adb shell monkey -p "$pkg" --throttle 50 25 >/dev/null || true; sleep 1; if timeout 15s adb logcat -d '*:E' | grep -E 'FATAL EXCEPTION|AndroidRuntime' | grep -q "$pkg"; then echo "Crash detected in $pkg"; timeout 15s adb logcat -d '*:E' || true; exit 1; fi; timeout 15s adb shell am force-stop "$pkg" || true; done
