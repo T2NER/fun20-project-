@@ -1,0 +1,96 @@
+name: Full Regression - 20 Apps
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+      - name: Build 20 debug APKs + 20 release AABs + lint all 20
+        run: |
+          gradle \
+            assembleTruthTapDebug assembleRoastButtonDebug assembleBsMeterDebug assembleFakeCallDebug assembleMostLikelyDebug assembleDareDropDebug assembleSettleItDebug assembleScreenCrackDebug assembleVoiceWarpDebug assemblePrankDeckDebug assembleAgeGuessDebug assembleFaceScoreDebug assembleBarkBackDebug assembleBabbleBackDebug assembleSpookyRadarDebug assembleSpinDecideDebug assembleAskOrbDebug assembleEscapeCallDebug assembleTapReflexDebug assemblePocketGuardDebug \
+            bundleTruthTapRelease bundleRoastButtonRelease bundleBsMeterRelease bundleFakeCallRelease bundleMostLikelyRelease bundleDareDropRelease bundleSettleItRelease bundleScreenCrackRelease bundleVoiceWarpRelease bundlePrankDeckRelease bundleAgeGuessRelease bundleFaceScoreRelease bundleBarkBackRelease bundleBabbleBackRelease bundleSpookyRadarRelease bundleSpinDecideRelease bundleAskOrbRelease bundleEscapeCallRelease bundleTapReflexRelease bundlePocketGuardRelease \
+            lintTruthTapDebug lintRoastButtonDebug lintBsMeterDebug lintFakeCallDebug lintMostLikelyDebug lintDareDropDebug lintSettleItDebug lintScreenCrackDebug lintVoiceWarpDebug lintPrankDeckDebug lintAgeGuessDebug lintFaceScoreDebug lintBarkBackDebug lintBabbleBackDebug lintSpookyRadarDebug lintSpinDecideDebug lintAskOrbDebug lintEscapeCallDebug lintTapReflexDebug lintPocketGuardDebug \
+            --stacktrace
+      - name: Verify artifact counts
+        run: |
+          APK_COUNT=$(find app/build/outputs/apk -name '*.apk' | wc -l)
+          AAB_COUNT=$(find app/build/outputs/bundle -name '*.aab' | wc -l)
+          echo "APKs=$APK_COUNT AABs=$AAB_COUNT"
+          test "$APK_COUNT" -ge 20
+          test "$AAB_COUNT" -ge 20
+      - name: Collect artifacts
+        run: |
+          mkdir -p regression-artifacts/apks regression-artifacts/aabs
+          find app/build/outputs/apk -name '*.apk' -exec cp {} regression-artifacts/apks/ \;
+          find app/build/outputs/bundle -name '*.aab' -exec cp {} regression-artifacts/aabs/ \;
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PlayFun20-builds
+          path: regression-artifacts
+
+  emulator-smoke:
+    needs: build-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+      - name: Build debug APKs
+        run: gradle assembleDebug --stacktrace
+      - name: Emulator smoke test all 20 apps
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            packages=(
+              com.t2ner.truthtap com.t2ner.roastbutton com.t2ner.bsmeter com.t2ner.fakecallfun
+              com.t2ner.mostlikelyparty com.t2ner.daredrop com.t2ner.settleit com.t2ner.screencrackprank
+              com.t2ner.voicewarplite com.t2ner.prankdeck com.t2ner.ageguessfun com.t2ner.facescorefun
+              com.t2ner.barkback com.t2ner.babbleback com.t2ner.spookyradar com.t2ner.spindecide
+              com.t2ner.askorb com.t2ner.escapecall com.t2ner.tapreflex com.t2ner.pocketguardalarm
+            )
+            apks=( $(find app/build/outputs/apk -name '*-debug.apk' | sort) )
+            test ${#apks[@]} -eq 20
+            for apk in "${apks[@]}"; do adb install -r "$apk" >/dev/null; done
+            for pkg in "${packages[@]}"; do
+              echo "SMOKE $pkg"
+              adb logcat -c
+              adb shell monkey -p "$pkg" -c android.intent.category.LAUNCHER 1 >/dev/null
+              sleep 2
+              adb shell monkey -p "$pkg" --throttle 50 25 >/dev/null || true
+              sleep 1
+              if adb logcat -d '*:E' | grep -E 'FATAL EXCEPTION|AndroidRuntime' | grep -q "$pkg"; then
+                echo "Crash detected in $pkg"
+                adb logcat -d '*:E'
+                exit 1
+              fi
+              adb shell am force-stop "$pkg"
+            done

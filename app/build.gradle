@@ -1,0 +1,53 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.t2ner.funpack'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 23
+        targetSdk 36
+        versionCode 1
+        versionName '1.0'
+    }
+
+    flavorDimensions += 'app'
+    productFlavors {
+        truthTap { dimension "app"; applicationId "com.t2ner.truthtap"; resValue "string", "app_name", "TruthTap"; buildConfigField "String", "APP_KEY", '"truthTap"' }
+        roastButton { dimension "app"; applicationId "com.t2ner.roastbutton"; resValue "string", "app_name", "Roast Button"; buildConfigField "String", "APP_KEY", '"roastButton"' }
+        bsMeter { dimension "app"; applicationId "com.t2ner.bsmeter"; resValue "string", "app_name", "BS Meter"; buildConfigField "String", "APP_KEY", '"bsMeter"' }
+        fakeCall { dimension "app"; applicationId "com.t2ner.fakecallfun"; resValue "string", "app_name", "Fake Call Fun"; buildConfigField "String", "APP_KEY", '"fakeCall"' }
+        mostLikely { dimension "app"; applicationId "com.t2ner.mostlikelyparty"; resValue "string", "app_name", "Most Likely Party"; buildConfigField "String", "APP_KEY", '"mostLikely"' }
+        dareDrop { dimension "app"; applicationId "com.t2ner.daredrop"; resValue "string", "app_name", "DareDrop"; buildConfigField "String", "APP_KEY", '"dareDrop"' }
+        settleIt { dimension "app"; applicationId "com.t2ner.settleit"; resValue "string", "app_name", "Settle It"; buildConfigField "String", "APP_KEY", '"settleIt"' }
+        screenCrack { dimension "app"; applicationId "com.t2ner.screencrackprank"; resValue "string", "app_name", "Screen Crack Prank"; buildConfigField "String", "APP_KEY", '"screenCrack"' }
+        voiceWarp { dimension "app"; applicationId "com.t2ner.voicewarplite"; resValue "string", "app_name", "VoiceWarp Lite"; buildConfigField "String", "APP_KEY", '"voiceWarp"' }
+        prankDeck { dimension "app"; applicationId "com.t2ner.prankdeck"; resValue "string", "app_name", "PrankDeck"; buildConfigField "String", "APP_KEY", '"prankDeck"' }
+        ageGuess { dimension "app"; applicationId "com.t2ner.ageguessfun"; resValue "string", "app_name", "AgeGuess Fun"; buildConfigField "String", "APP_KEY", '"ageGuess"' }
+        faceScore { dimension "app"; applicationId "com.t2ner.facescorefun"; resValue "string", "app_name", "FaceScore Fun"; buildConfigField "String", "APP_KEY", '"faceScore"' }
+        barkBack { dimension "app"; applicationId "com.t2ner.barkback"; resValue "string", "app_name", "BarkBack"; buildConfigField "String", "APP_KEY", '"barkBack"' }
+        babbleBack { dimension "app"; applicationId "com.t2ner.babbleback"; resValue "string", "app_name", "BabbleBack"; buildConfigField "String", "APP_KEY", '"babbleBack"' }
+        spookyRadar { dimension "app"; applicationId "com.t2ner.spookyradar"; resValue "string", "app_name", "Spooky Radar"; buildConfigField "String", "APP_KEY", '"spookyRadar"' }
+        spinDecide { dimension "app"; applicationId "com.t2ner.spindecide"; resValue "string", "app_name", "SpinDecide"; buildConfigField "String", "APP_KEY", '"spinDecide"' }
+        askOrb { dimension "app"; applicationId "com.t2ner.askorb"; resValue "string", "app_name", "AskOrb"; buildConfigField "String", "APP_KEY", '"askOrb"' }
+        escapeCall { dimension "app"; applicationId "com.t2ner.escapecall"; resValue "string", "app_name", "EscapeCall"; buildConfigField "String", "APP_KEY", '"escapeCall"' }
+        tapReflex { dimension "app"; applicationId "com.t2ner.tapreflex"; resValue "string", "app_name", "TapReflex"; buildConfigField "String", "APP_KEY", '"tapReflex"' }
+        pocketGuard { dimension "app"; applicationId "com.t2ner.pocketguardalarm"; resValue "string", "app_name", "PocketGuard Alarm"; buildConfigField "String", "APP_KEY", '"pocketGuard"' }
+    }
+
+    buildFeatures {
+        buildConfig true
+        resValues true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packaging {
+        resources { excludes += ['/META-INF/{AL2.0,LGPL2.1}'] }
+    }
+}
