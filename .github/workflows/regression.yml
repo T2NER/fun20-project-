@@ -67,7 +67,7 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_6
-          disable-animations: true
+          disable-animations: false
           script: |
             set -euo pipefail
             packages=(
