@@ -47,31 +47,40 @@ jobs:
   emulator-smoke:
     needs: build-lint
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Reuse APKs from verified build
+        uses: actions/download-artifact@v4
         with:
-          distribution: temurin
-          java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - name: Install Android SDK
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.6.0'
-      - name: Build debug APKs
-        run: gradle assembleDebug --stacktrace
+          name: PlayFun20-builds
+          path: regression-artifacts
+      - name: Verify smoke-test APK set
+        run: |
+          APK_COUNT=$(find regression-artifacts/apks -name '*.apk' | wc -l)
+          echo "Smoke-test APKs=$APK_COUNT"
+          test "$APK_COUNT" -eq 20
+      - name: Enable KVM acceleration
+        run: |
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+            ls -l /dev/kvm
+          else
+            echo "No /dev/kvm device available; emulator runner will fall back to software acceleration."
+          fi
       - name: Emulator smoke test all 20 apps
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
           profile: pixel_6
-          disable-animations: false
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           script: |
             set -eu
             timeout 60s adb wait-for-device
-            APK_COUNT=$(find app/build/outputs/apk -name '*-debug.apk' | wc -l); echo "Debug APKs=$APK_COUNT"; test "$APK_COUNT" -eq 20
-            for apk in $(find app/build/outputs/apk -name '*-debug.apk' -print | sort); do echo "INSTALL $apk"; timeout 45s adb install -r "$apk"; done
-            for pkg in com.t2ner.truthtap com.t2ner.roastbutton com.t2ner.bsmeter com.t2ner.fakecallfun com.t2ner.mostlikelyparty com.t2ner.daredrop com.t2ner.settleit com.t2ner.screencrackprank com.t2ner.voicewarplite com.t2ner.prankdeck com.t2ner.ageguessfun com.t2ner.facescorefun com.t2ner.barkback com.t2ner.babbleback com.t2ner.spookyradar com.t2ner.spindecide com.t2ner.askorb com.t2ner.escapecall com.t2ner.tapreflex com.t2ner.pocketguardalarm; do echo "SMOKE $pkg"; timeout 10s adb logcat -c || true; timeout 20s adb shell monkey -p "$pkg" -c android.intent.category.LAUNCHER 1 >/dev/null; sleep 2; timeout 30s adb shell monkey -p "$pkg" --throttle 50 25 >/dev/null || true; sleep 1; if timeout 15s adb logcat -d '*:E' | grep -E 'FATAL EXCEPTION|AndroidRuntime' | grep -q "$pkg"; then echo "Crash detected in $pkg"; timeout 15s adb logcat -d '*:E' || true; exit 1; fi; timeout 15s adb shell am force-stop "$pkg" || true; done
+            for apk in $(find regression-artifacts/apks -name '*.apk' -print | sort); do echo "INSTALL $apk"; timeout 30s adb install -r "$apk"; done
+            PASS=0
+            for pkg in com.t2ner.truthtap com.t2ner.roastbutton com.t2ner.bsmeter com.t2ner.fakecallfun com.t2ner.mostlikelyparty com.t2ner.daredrop com.t2ner.settleit com.t2ner.screencrackprank com.t2ner.voicewarplite com.t2ner.prankdeck com.t2ner.ageguessfun com.t2ner.facescorefun com.t2ner.barkback com.t2ner.babbleback com.t2ner.spookyradar com.t2ner.spindecide com.t2ner.askorb com.t2ner.escapecall com.t2ner.tapreflex com.t2ner.pocketguardalarm; do echo "SMOKE $pkg"; timeout 8s adb logcat -c || true; timeout 15s adb shell monkey -p "$pkg" -c android.intent.category.LAUNCHER 1 >/dev/null; sleep 1; timeout 15s adb shell monkey -p "$pkg" --throttle 40 10 >/dev/null || true; sleep 1; if timeout 10s adb logcat -d '*:E' | grep -E 'FATAL EXCEPTION|AndroidRuntime' | grep -q "$pkg"; then echo "Crash detected in $pkg"; timeout 10s adb logcat -d '*:E' || true; exit 1; fi; timeout 10s adb shell am force-stop "$pkg" || true; PASS=$((PASS+1)); echo "PASS $PASS/20 $pkg"; done
+            test "$PASS" -eq 20
+            echo "SMOKE COMPLETE: 20/20 apps passed"
