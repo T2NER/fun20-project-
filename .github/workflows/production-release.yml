@@ -1,0 +1,92 @@
+name: Production Release - 20 Apps
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PLAYFUN20_PRODUCTION: 'true'
+  UPLOAD_KEYSTORE_PATH: ${{ github.workspace }}/playfun20-upload.jks
+  UPLOAD_STORE_PASSWORD: ${{ secrets.UPLOAD_STORE_PASSWORD }}
+  UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
+  UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+
+jobs:
+  production-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Validate required production secrets
+        env:
+          UPLOAD_KEYSTORE_B64: ${{ secrets.UPLOAD_KEYSTORE_B64 }}
+          ADMOB_PROPERTIES_B64: ${{ secrets.ADMOB_PROPERTIES_B64 }}
+        run: |
+          set -eu
+          test -n "$UPLOAD_KEYSTORE_B64"
+          test -n "$UPLOAD_STORE_PASSWORD"
+          test -n "$UPLOAD_KEY_ALIAS"
+          test -n "$UPLOAD_KEY_PASSWORD"
+          test -n "$ADMOB_PROPERTIES_B64"
+
+      - name: Materialize upload keystore and AdMob properties
+        env:
+          UPLOAD_KEYSTORE_B64: ${{ secrets.UPLOAD_KEYSTORE_B64 }}
+          ADMOB_PROPERTIES_B64: ${{ secrets.ADMOB_PROPERTIES_B64 }}
+        run: |
+          set -eu
+          printf '%s' "$UPLOAD_KEYSTORE_B64" | base64 --decode > "$UPLOAD_KEYSTORE_PATH"
+          chmod 600 "$UPLOAD_KEYSTORE_PATH"
+          mkdir -p "$HOME/.gradle"
+          printf '%s' "$ADMOB_PROPERTIES_B64" | base64 --decode > "$HOME/.gradle/gradle.properties"
+          chmod 600 "$HOME/.gradle/gradle.properties"
+
+      - name: Reject missing or Google test AdMob IDs
+        run: gradle :app:verifyProductionConfig --stacktrace
+
+      - name: Build all 20 signed production AABs
+        run: |
+          gradle \
+            bundleTruthTapRelease bundleRoastButtonRelease bundleBsMeterRelease bundleFakeCallRelease bundleMostLikelyRelease bundleDareDropRelease bundleSettleItRelease bundleScreenCrackRelease bundleVoiceWarpRelease bundlePrankDeckRelease bundleAgeGuessRelease bundleFaceScoreRelease bundleBarkBackRelease bundleBabbleBackRelease bundleSpookyRadarRelease bundleSpinDecideRelease bundleAskOrbRelease bundleEscapeCallRelease bundleTapReflexRelease bundlePocketGuardRelease \
+            --stacktrace
+
+      - name: Verify exact AAB count and signatures
+        run: |
+          set -eu
+          AAB_COUNT=$(find app/build/outputs/bundle -name '*.aab' | wc -l)
+          echo "Production AABs=$AAB_COUNT"
+          test "$AAB_COUNT" -eq 20
+          for aab in $(find app/build/outputs/bundle -name '*.aab' -print | sort); do
+            echo "VERIFY SIGNATURE $aab"
+            jarsigner -verify -strict "$aab" >/dev/null
+          done
+
+      - name: Collect production bundles
+        run: |
+          mkdir -p production-artifacts/aabs
+          find app/build/outputs/bundle -name '*.aab' -exec cp {} production-artifacts/aabs/ \;
+          find production-artifacts/aabs -name '*.aab' -print | sort > production-artifacts/AAB_MANIFEST.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PlayFun20-production-signed-aabs
+          path: production-artifacts
+          if-no-files-found: error
+          retention-days: 30
